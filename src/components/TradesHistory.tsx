@@ -23,9 +23,9 @@ export const TradesHistory = () => {
     >
       <h2 className="text-base sm:text-lg font-semibold tracking-tight mb-3 sm:mb-4">Trades History</h2>
       
-      <div className="rounded-lg border border-border overflow-x-auto -mx-3 sm:-mx-4 md:-mx-5 lg:-mx-6">
-        <div className="inline-block min-w-full px-3 sm:px-4 md:px-5 lg:px-6">
-          <Table className="min-w-[640px] text-xs sm:text-sm">
+      <div className="rounded-lg border border-border overflow-x-auto">
+        <div className="min-w-full">
+          <Table className="min-w-[500px] sm:min-w-[640px] text-xs sm:text-sm">
             <TableHeader>
               <TableRow>
                 <TableHead>Symbol</TableHead>

@@ -39,10 +39,11 @@ export const TickerTape = () => {
   }, []);
 
   return (
-    <div className="w-full border-t border-border bg-card">
+    <div className="w-full border-t border-border bg-card overflow-hidden">
       <div
         ref={containerRef}
-        className="tradingview-widget-container"
+        className="tradingview-widget-container w-full"
+        style={{ width: '100%', minWidth: '100%' }}
       />
     </div>
   );

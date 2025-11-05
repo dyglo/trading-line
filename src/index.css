@@ -118,6 +118,7 @@ All colors MUST be HSL.
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
+    overflow-x: hidden;
   }
 
   body {
@@ -126,6 +127,8 @@ All colors MUST be HSL.
     -moz-osx-font-smoothing: grayscale;
     touch-action: manipulation;
     overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
   }
 
   /* Improve touch targets on mobile */

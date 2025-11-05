@@ -8,10 +8,10 @@ import { TradesHistory } from '@/components/TradesHistory';
 
 const Dashboard = () => {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       <Header />
       
-      <main className="container mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4 md:py-6">
+      <main className="w-full mx-auto px-4 sm:px-6 md:px-8 lg:px-10 py-3 sm:py-4 md:py-6 max-w-[1400px]">
         <div className="grid gap-3 sm:gap-4 md:gap-6 lg:grid-cols-[1fr_420px]">
           {/* Left Column - Main Content */}
           <div className="space-y-3 sm:space-y-4 md:space-y-6">

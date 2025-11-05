@@ -22,10 +22,10 @@ export const OrdersTable = () => {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="rounded-lg border border-border overflow-x-auto -mx-4 sm:-mx-5 lg:-mx-6"
+      className="rounded-lg border border-border overflow-x-auto"
     >
-      <div className="inline-block min-w-full px-4 sm:px-5 lg:px-6">
-        <Table className="min-w-[640px]">
+      <div className="min-w-full">
+        <Table className="min-w-[500px] sm:min-w-[640px]">
           <TableHeader>
             <TableRow>
               <TableHead>Symbol</TableHead>

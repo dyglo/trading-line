@@ -20,9 +20,10 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
       <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
+        <div className="overflow-x-hidden w-full">
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
           <AuthProvider>
             <Routes>
               <Route path="/" element={<Landing />} />
@@ -42,6 +43,7 @@ const App = () => (
             </Routes>
           </AuthProvider>
         </BrowserRouter>
+        </div>
       </TooltipProvider>
     </ThemeProvider>
   </QueryClientProvider>
