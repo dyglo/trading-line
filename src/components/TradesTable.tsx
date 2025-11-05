@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
-import { useTradingStore } from '@/store/tradingStore';
+import { useTradingStore, type Trade } from '@/store/tradingStore';
 import {
   Table,
   TableBody,
@@ -19,7 +19,7 @@ export const TradesTable = () => {
 
   const openTrades = trades.filter((t) => !t.closedAt);
 
-  const calculatePnL = (trade: any) => {
+  const calculatePnL = (trade: Trade) => {
     if (trade.closedAt) return trade.pnl;
     
     const currentPrice = prices[trade.symbol] || trade.avgPrice;

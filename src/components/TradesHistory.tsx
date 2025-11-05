@@ -19,13 +19,13 @@ export const TradesHistory = () => {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, delay: 0.1 }}
-      className="rounded-2xl border border-border bg-card p-4 sm:p-5 lg:p-6 shadow-sm"
+      className="rounded-xl sm:rounded-2xl border border-border bg-card p-3 sm:p-4 md:p-5 lg:p-6 shadow-sm"
     >
-      <h2 className="text-lg font-semibold tracking-tight mb-4">Trades History</h2>
+      <h2 className="text-base sm:text-lg font-semibold tracking-tight mb-3 sm:mb-4">Trades History</h2>
       
-      <div className="rounded-lg border border-border overflow-x-auto -mx-4 sm:-mx-5 lg:-mx-6">
-        <div className="inline-block min-w-full px-4 sm:px-5 lg:px-6">
-          <Table className="min-w-[640px]">
+      <div className="rounded-lg border border-border overflow-x-auto -mx-3 sm:-mx-4 md:-mx-5 lg:-mx-6">
+        <div className="inline-block min-w-full px-3 sm:px-4 md:px-5 lg:px-6">
+          <Table className="min-w-[640px] text-xs sm:text-sm">
             <TableHeader>
               <TableRow>
                 <TableHead>Symbol</TableHead>

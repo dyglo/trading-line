@@ -3,7 +3,7 @@ import {
   Zap, 
   TrendingUp, 
   BarChart3, 
-  Infinity,
+  Infinity as InfinityIcon,
   CheckCircle2
 } from 'lucide-react';
 
@@ -30,7 +30,7 @@ const benefits = [
     bgColor: 'bg-primary/10',
   },
   {
-    icon: Infinity,
+    icon: InfinityIcon,
     stat: 'Unlimited',
     description: 'Practice trades with no restrictions',
     color: 'text-long',

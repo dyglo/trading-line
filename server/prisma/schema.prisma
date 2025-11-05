@@ -1,0 +1,100 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OnboardingQuestionType {
+  SINGLE_SELECT
+  MULTI_SELECT
+  FREE_TEXT
+}
+
+model User {
+  id                     String                    @id @default(cuid())
+  username               String                    @unique
+  email                  String                    @unique
+  passwordHash           String
+  isOnboardingComplete   Boolean                   @default(false)
+  lastLoginAt            DateTime?
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+  sessions               Session[]
+  onboardingResponses    UserOnboardingResponse[]
+  preference             UserPreference?
+}
+
+model Session {
+  id           String    @id @default(cuid())
+  refreshToken String    @unique
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userAgent    String?
+  ipAddress    String?
+  expiresAt    DateTime
+  createdAt    DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model OnboardingQuestion {
+  id         String                    @id @default(cuid())
+  prompt     String                    @unique
+  description String?
+  type       OnboardingQuestionType    @default(SINGLE_SELECT)
+  order      Int                       @default(0)
+  isActive   Boolean                   @default(true)
+  createdAt  DateTime                  @default(now())
+  updatedAt  DateTime                  @updatedAt
+  options    OnboardingOption[]
+  responses  UserOnboardingResponse[]
+}
+
+model OnboardingOption {
+  id          String               @id @default(cuid())
+  questionId  String
+  question    OnboardingQuestion   @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  label       String
+  value       String
+  order       Int                  @default(0)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  responses   UserOnboardingResponse[]
+
+  @@unique([questionId, value])
+  @@index([questionId, order])
+}
+
+model UserOnboardingResponse {
+  id          String              @id @default(cuid())
+  userId      String
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionId  String
+  question    OnboardingQuestion  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  optionId    String?
+  option      OnboardingOption?   @relation(fields: [optionId], references: [id], onDelete: SetNull)
+  freeText    String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([questionId])
+  @@index([optionId])
+  @@index([userId, questionId])
+}
+
+model UserPreference {
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startingBalance      Decimal  @default(10000.00) @db.Decimal(14, 2)
+  currentBalance       Decimal  @default(10000.00) @db.Decimal(14, 2)
+  baseCurrency         String   @default("USD")
+  autoResetOnStopOut   Boolean  @default(false)
+  notificationsEnabled Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}

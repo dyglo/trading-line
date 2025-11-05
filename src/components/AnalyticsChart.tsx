@@ -47,12 +47,12 @@ export const AnalyticsChart = () => {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
-      className="rounded-2xl border border-border bg-card p-0 shadow-sm overflow-hidden h-[400px] sm:h-[500px] md:h-[550px] lg:h-[600px]"
+      className="w-full rounded-xl sm:rounded-2xl border border-border bg-card p-0 shadow-sm overflow-hidden h-[280px] xs:h-[320px] sm:h-[420px] md:h-[550px] lg:h-[600px]"
     >
       <div
         ref={containerRef}
-        className="tradingview-widget-container"
-        style={{ height: '100%', width: '100%' }}
+        className="tradingview-widget-container h-full w-full [&_iframe]:!touch-none"
+        style={{ minHeight: '280px' }}
       />
     </motion.div>
   );

@@ -11,10 +11,10 @@ const Dashboard = () => {
     <div className="min-h-screen bg-background">
       <Header />
       
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
-        <div className="grid gap-4 sm:gap-6 lg:grid-cols-[1fr_420px]">
+      <main className="container mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4 md:py-6">
+        <div className="grid gap-3 sm:gap-4 md:gap-6 lg:grid-cols-[1fr_420px]">
           {/* Left Column - Main Content */}
-          <div className="space-y-4 sm:space-y-6">
+          <div className="space-y-3 sm:space-y-4 md:space-y-6">
             <AnalyticsChart />
             <PortfolioDashboard />
             <AccountPanel />

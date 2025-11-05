@@ -56,11 +56,11 @@ export const PortfolioDashboard = () => {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
-      className="rounded-2xl border border-border bg-card p-4 sm:p-5 lg:p-6 shadow-sm"
+      className="rounded-xl sm:rounded-2xl border border-border bg-card p-3 sm:p-4 md:p-5 lg:p-6 shadow-sm"
     >
-      <h2 className="text-lg font-semibold tracking-tight mb-4">Performance Metrics</h2>
+      <h2 className="text-base sm:text-lg font-semibold tracking-tight mb-3 sm:mb-4">Performance Metrics</h2>
       
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
         {metrics.map((metric, index) => {
           const Icon = metric.icon;
           return (
@@ -69,17 +69,17 @@ export const PortfolioDashboard = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.2, delay: index * 0.05 }}
-              className="relative overflow-hidden rounded-xl border border-border bg-background p-4"
+              className="relative overflow-hidden rounded-lg sm:rounded-xl border border-border bg-background p-3 sm:p-4 min-h-[80px] sm:min-h-[90px] touch-manipulation"
             >
-              <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">{metric.label}</p>
-                  <p className={`text-xl sm:text-2xl font-bold ${metric.color}`}>
+              <div className="flex items-start justify-between h-full">
+                <div className="space-y-1 flex-1 min-w-0">
+                  <p className="text-[10px] xs:text-xs text-muted-foreground truncate">{metric.label}</p>
+                  <p className={`text-lg sm:text-xl md:text-2xl font-bold ${metric.color} break-words`}>
                     {metric.value}
                   </p>
                 </div>
-                <div className={`rounded-lg p-2 ${metric.bgColor}`}>
-                  <Icon className={`h-4 w-4 ${metric.color}`} />
+                <div className={`rounded-lg p-1.5 sm:p-2 ${metric.bgColor} flex-shrink-0 ml-2`}>
+                  <Icon className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${metric.color}`} />
                 </div>
               </div>
             </motion.div>
@@ -88,8 +88,8 @@ export const PortfolioDashboard = () => {
       </div>
 
       {closedTrades.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-border">
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 text-sm">
+        <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-border">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 md:gap-4 text-xs sm:text-sm">
             <div>
               <span className="text-muted-foreground">Avg Win: </span>
               <span className="font-medium text-long">+${avgWin.toFixed(2)}</span>

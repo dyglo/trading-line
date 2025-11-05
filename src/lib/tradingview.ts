@@ -1,6 +1,11 @@
+interface TradingViewWidgetConfig {
+  src?: string;
+  [key: string]: unknown;
+}
+
 export const loadTradingViewScript = (
   containerId: string,
-  widgetConfig: any
+  widgetConfig: TradingViewWidgetConfig
 ): (() => void) => {
   if (typeof window === 'undefined') return () => {};
 
