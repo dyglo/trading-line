@@ -61,6 +61,23 @@ export const createApp = () => {
   app.use(express.urlencoded({ extended: true }));
   app.use(cookieParser());
 
+  // Temporary debug endpoint to inspect requests in production.
+  // Call from the browser or curl to see what method, headers and body arrive at Express.
+  app.all("/api/_debug", async (req: Request, res: Response) => {
+    try {
+      const body = req.body ?? null;
+      res.json({
+        ok: true,
+        method: req.method,
+        url: req.originalUrl || req.url,
+        headers: req.headers,
+        body
+      });
+    } catch (err) {
+      res.status(500).json({ ok: false, error: (err as Error).message });
+    }
+  });
+
   app.get("/healthz", async (_req: Request, res: Response) => {
     try {
       await prisma.$queryRaw`SELECT 1`;
