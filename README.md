@@ -246,6 +246,14 @@ The app supports both dark and light themes:
 - `npm run preview` - Preview production build
 - `npm run lint` - Run ESLint
 
+### Environment Variables
+
+- `VITE_API_URL` should remain `/api` in production so the SPA and the serverless API share the same origin on Vercel.
+- `DATABASE_URL` must point at the Render Postgres instance and include `sslmode=require`.
+- `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` need random 32+ character strings and must be present in Vercel's environment settings.
+- `CORS_ORIGIN` accepts a comma-separated list (for example `http://localhost:8080,https://your-production-domain.vercel.app`) or `*` to reflect the inbound origin.
+- Set `COOKIE_SECURE=true` in production to ensure auth cookies are transmitted over HTTPS only.
+
 ### Code Style
 
 - **TypeScript**: Strict type checking enabled

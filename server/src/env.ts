@@ -60,6 +60,21 @@ const refreshTokenExpiresIn = parsed.data.REFRESH_TOKEN_EXPIRES_IN
   ? Number.parseInt(parsed.data.REFRESH_TOKEN_EXPIRES_IN, 10)
   : 60 * 60 * 24 * 7; // 7 days
 
+const parseCorsOrigin = (value?: string) => {
+  if (!value) {
+    return ["http://localhost:8080"];
+  }
+
+  if (value.trim() === "*") {
+    return true as const;
+  }
+
+  return value
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+};
+
 export const env = {
   databaseUrl: parsed.data.DATABASE_URL,
   port: parsed.data.PORT ?? 4000,
@@ -75,6 +90,6 @@ export const env = {
     domain: parsed.data.COOKIE_DOMAIN
   },
   cors: {
-    origin: parsed.data.CORS_ORIGIN ?? "http://localhost:8080"
+    origin: parseCorsOrigin(parsed.data.CORS_ORIGIN)
   }
 };
