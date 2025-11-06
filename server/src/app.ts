@@ -30,6 +30,26 @@ export const createApp = () => {
     optionsSuccessStatus: 204
   };
 
+  // Log incoming requests in production so we can diagnose 405/route issues on Vercel.
+  // This middleware intentionally runs early so all requests (including OPTIONS) are logged.
+  app.use((req, _res, next) => {
+    try {
+      // Log method, originalUrl and origin header to make debugging easier in Vercel logs
+      console.log(`[REQ] ${req.method} ${req.originalUrl || req.url} Origin:${req.headers.origin ?? "-"}`);
+    } catch (err) {
+      // swallow logging errors
+    }
+    return next();
+  });
+
+  // Ensure allowed methods header is always present. CORS middleware normally sets this for
+  // preflight responses, but in some serverless environments explicit header helps avoid
+  // ambiguous responses that can surface as 405 in the browser.
+  app.use((_req, res, next) => {
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+    return next();
+  });
+
   app.use(cors(corsOptions));
   app.options("*", cors(corsOptions));
   app.use(
