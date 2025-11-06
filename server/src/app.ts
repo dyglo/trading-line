@@ -4,6 +4,9 @@ import type { NextFunction, Request, Response } from "express";
 import express from "express";
 import helmet from "helmet";
 
+// Ensure type definitions are included in the build
+import "./types/express.js";
+
 import { env } from "./env.js";
 import authRouter from "./routes/auth.routes.js";
 import onboardingRouter from "./routes/onboarding.routes.js";
