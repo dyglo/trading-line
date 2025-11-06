@@ -20,5 +20,7 @@ if (!expressApp) {
   throw new Error("Failed to load Express app for serverless handler.");
 }
 
+const handler = (req: Parameters<Express["handle"]>[0], res: Parameters<Express["handle"]>[1]) => expressApp(req, res);
+
 export const app = expressApp;
-export default expressApp;
+export default handler;
