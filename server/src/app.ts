@@ -34,7 +34,7 @@ export const createApp = () => {
   app.use(express.urlencoded({ extended: true }));
   app.use(cookieParser());
 
-  app.get("/healthz", async (_req, res) => {
+  app.get("/healthz", async (_req: Request, res: Response) => {
     try {
       await prisma.$queryRaw`SELECT 1`;
       res.json({ status: "ok" });
@@ -47,7 +47,7 @@ export const createApp = () => {
   app.use("/api/profile", profileRouter);
   app.use("/api/onboarding", onboardingRouter);
 
-  app.use("/api", (_req, res) => {
+  app.use("/api", (_req: Request, res: Response) => {
     res.status(404).json({ message: "API route not found." });
   });
 
