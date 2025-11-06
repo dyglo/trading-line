@@ -1,6 +1,6 @@
 import type { Response } from "express";
 
-import { ACCESS_TOKEN_COOKIE, COOKIE_PATH, REFRESH_TOKEN_COOKIE } from "../constants.js";
+import { COOKIE_PATH, SESSION_TOKEN_COOKIE } from "../constants.js";
 import { env } from "../env.js";
 
 const baseCookieOptions = {
@@ -13,27 +13,13 @@ const baseCookieOptions = {
   path: COOKIE_PATH
 };
 
-export const setAuthCookies = (res: Response, accessToken: string, refreshToken: string) => {
-  const accessTokenMaxAge = typeof env.jwt.accessTokenExpiresIn === 'number' 
-    ? env.jwt.accessTokenExpiresIn * 1000
-    : Number.parseInt(String(env.jwt.accessTokenExpiresIn), 10) * 1000;
-  
-  const refreshTokenMaxAge = typeof env.jwt.refreshTokenExpiresIn === 'number' 
-    ? env.jwt.refreshTokenExpiresIn * 1000
-    : Number.parseInt(String(env.jwt.refreshTokenExpiresIn), 10) * 1000;
-
-  res.cookie(ACCESS_TOKEN_COOKIE, accessToken, {
+export const setSessionCookie = (res: Response, sessionToken: string) => {
+  res.cookie(SESSION_TOKEN_COOKIE, sessionToken, {
     ...baseCookieOptions,
-    maxAge: accessTokenMaxAge
-  });
-
-  res.cookie(REFRESH_TOKEN_COOKIE, refreshToken, {
-    ...baseCookieOptions,
-    maxAge: refreshTokenMaxAge
+    maxAge: env.session.ttlMs
   });
 };
 
-export const clearAuthCookies = (res: Response) => {
-  res.clearCookie(ACCESS_TOKEN_COOKIE, baseCookieOptions);
-  res.clearCookie(REFRESH_TOKEN_COOKIE, baseCookieOptions);
+export const clearSessionCookie = (res: Response) => {
+  res.clearCookie(SESSION_TOKEN_COOKIE, baseCookieOptions);
 };

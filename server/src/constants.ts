@@ -1,3 +1,4 @@
-export const ACCESS_TOKEN_COOKIE = "tline_access_token";
-export const REFRESH_TOKEN_COOKIE = "tline_refresh_token";
+import { env } from "./env.js";
+
+export const SESSION_TOKEN_COOKIE = env.session.cookieName;
 export const COOKIE_PATH = "/";

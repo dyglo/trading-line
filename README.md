@@ -240,7 +240,7 @@ The app supports both dark and light themes:
 
 ### Available Scripts
 
-- `npm run dev` - Start development server
+- `npm run dev` - Start frontend + API development servers together
 - `npm run build` - Build for production
 - `npm run build:dev` - Build in development mode
 - `npm run preview` - Preview production build
@@ -250,7 +250,7 @@ The app supports both dark and light themes:
 
 - `VITE_API_URL` should remain `/api` in production so the SPA and the serverless API share the same origin on Vercel.
 - `DATABASE_URL` must point at the Render Postgres instance and include `sslmode=require`.
-- `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` need random 32+ character strings and must be present in Vercel's environment settings.
+- `SESSION_TOKEN_TTL_DAYS` is optional (defaults to 30) if you want to shorten or extend the authenticated session lifetime.
 - `CORS_ORIGIN` accepts a comma-separated list (for example `http://localhost:8080,https://your-production-domain.vercel.app`) or `*` to reflect the inbound origin.
 - Set `COOKIE_SECURE=true` in production to ensure auth cookies are transmitted over HTTPS only.
 

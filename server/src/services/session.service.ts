@@ -1,77 +1,111 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
+
+import type { Prisma, Session } from "@prisma/client";
 
 import { prisma } from "../prisma.js";
 import { env } from "../env.js";
-import { hashToken, verifyToken } from "../utils/password.js";
+
+const SESSION_TOKEN_BYTE_LENGTH = 36;
+
+const authUserSelect = {
+  id: true,
+  username: true,
+  email: true,
+  isOnboardingComplete: true
+} satisfies Prisma.UserSelect;
+
+export type SessionWithAuthUser = Prisma.SessionGetPayload<{
+  include: { user: { select: typeof authUserSelect } };
+}>;
+
+const generateSessionToken = () => randomBytes(SESSION_TOKEN_BYTE_LENGTH).toString("hex");
+const hashSessionToken = (token: string) => createHash("sha256").update(token).digest("hex");
+
+const futureExpiry = () => new Date(Date.now() + env.session.ttlMs);
 
 interface CreateSessionParams {
   userId: string;
-  refreshToken: string;
   userAgent?: string | null;
   ipAddress?: string | null;
-  sessionId?: string;
 }
 
-export const generateSessionId = () => randomUUID();
+export const createSession = async ({ userId, userAgent, ipAddress }: CreateSessionParams) => {
+  const token = generateSessionToken();
+  const tokenHash = hashSessionToken(token);
 
-const calculateRefreshExpiry = () => {
-  // env.jwt.refreshTokenExpiresIn is already a number (in seconds)
-  const expiresInSeconds = typeof env.jwt.refreshTokenExpiresIn === 'number' 
-    ? env.jwt.refreshTokenExpiresIn 
-    : Number.parseInt(String(env.jwt.refreshTokenExpiresIn), 10);
-  
-  if (isNaN(expiresInSeconds) || expiresInSeconds <= 0) {
-    // Default to 7 days if invalid
-    return new Date(Date.now() + 60 * 60 * 24 * 7 * 1000);
-  }
-  
-  return new Date(Date.now() + expiresInSeconds * 1000);
-};
-
-export const createSession = async ({
-  userId,
-  refreshToken,
-  userAgent,
-  ipAddress,
-  sessionId = generateSessionId()
-}: CreateSessionParams) => {
-  const hashedRefresh = await hashToken(refreshToken);
-
-  await prisma.session.create({
+  const session = await prisma.session.create({
     data: {
-      id: sessionId,
+      tokenHash,
       userId,
-      refreshToken: hashedRefresh,
       userAgent: userAgent ?? null,
       ipAddress: ipAddress ?? null,
-      expiresAt: calculateRefreshExpiry()
+      expiresAt: futureExpiry(),
+      lastUsedAt: new Date()
     }
   });
 
-  return sessionId;
+  return { session, token };
 };
 
-export const updateSessionRefreshToken = async (sessionId: string, refreshToken: string) => {
-  const hashedRefresh = await hashToken(refreshToken);
-
-  await prisma.session.update({
-    where: { id: sessionId },
-    data: {
-      refreshToken: hashedRefresh,
-      expiresAt: calculateRefreshExpiry()
-    }
-  });
-};
-
-export const findSessionById = async (sessionId: string) =>
+export const findSessionById = (sessionId: string) =>
   prisma.session.findUnique({
     where: { id: sessionId }
   });
 
-export const deleteSessionById = async (sessionId: string) =>
+export const findSessionWithUserByToken = async (token: string) => {
+  const tokenHash = hashSessionToken(token);
+
+  return prisma.session.findUnique({
+    where: { tokenHash },
+    include: { user: { select: authUserSelect } }
+  });
+};
+
+export const deleteSessionById = (sessionId: string) =>
   prisma.session.deleteMany({
     where: { id: sessionId }
   });
 
-export const validateRefreshToken = async (storedHash: string, providedToken: string) =>
-  verifyToken(providedToken, storedHash);
+export const deleteSessionByToken = async (token: string) => {
+  const tokenHash = hashSessionToken(token);
+
+  await prisma.session.deleteMany({
+    where: { tokenHash }
+  });
+};
+
+export const rotateSessionToken = async (sessionId: string) => {
+  const token = generateSessionToken();
+  const tokenHash = hashSessionToken(token);
+
+  const session = await prisma.session.update({
+    where: { id: sessionId },
+    data: {
+      tokenHash,
+      expiresAt: futureExpiry(),
+      lastUsedAt: new Date()
+    }
+  });
+
+  return { session, token };
+};
+
+export const touchSession = (sessionId: string) =>
+  prisma.session.update({
+    where: { id: sessionId },
+    data: {
+      lastUsedAt: new Date()
+    }
+  });
+
+export const purgeExpiredSessionsForUser = (userId: string) =>
+  prisma.session.deleteMany({
+    where: {
+      userId,
+      expiresAt: {
+        lt: new Date()
+      }
+    }
+  });
+
+export const isSessionExpired = (session: Pick<Session, "expiresAt">) => session.expiresAt.getTime() <= Date.now();

@@ -1,10 +1,16 @@
 import type { NextFunction, Request, Response } from "express";
 
-import { ACCESS_TOKEN_COOKIE } from "../constants.js";
-import { verifyAccessToken } from "../utils/jwt.js";
+import { SESSION_TOKEN_COOKIE } from "../constants.js";
+import {
+  deleteSessionById,
+  findSessionWithUserByToken,
+  isSessionExpired,
+  touchSession
+} from "../services/session.service.js";
+import { clearSessionCookie } from "../utils/cookies.js";
 
-export const getAccessTokenFromRequest = (req: Request) => {
-  const fromCookie = req.cookies?.[ACCESS_TOKEN_COOKIE];
+export const getSessionTokenFromRequest = (req: Request) => {
+  const fromCookie = req.cookies?.[SESSION_TOKEN_COOKIE];
 
   if (typeof fromCookie === "string" && fromCookie.length > 0) {
     return fromCookie;
@@ -19,24 +25,42 @@ export const getAccessTokenFromRequest = (req: Request) => {
   return null;
 };
 
-export const requireAuth = (req: Request, res: Response, next: NextFunction) => {
-  const token = getAccessTokenFromRequest(req);
+export const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
+  const token = getSessionTokenFromRequest(req);
 
   if (!token) {
     return res.status(401).json({ message: "Authentication required." });
   }
 
   try {
-    const payload = verifyAccessToken(token);
+    const session = await findSessionWithUserByToken(token);
+
+    if (!session || !session.user) {
+      clearSessionCookie(res);
+      return res.status(401).json({ message: "Invalid session." });
+    }
+
+    if (isSessionExpired(session)) {
+      await deleteSessionById(session.id);
+      clearSessionCookie(res);
+      return res.status(401).json({ message: "Session expired." });
+    }
+
     req.authUser = {
-      id: payload.sub,
-      username: payload.username,
-      email: payload.email,
-      isOnboardingComplete: payload.isOnboardingComplete
+      id: session.user.id,
+      username: session.user.username,
+      email: session.user.email,
+      isOnboardingComplete: session.user.isOnboardingComplete
     };
-    req.sessionId = payload.sessionId;
+    req.sessionId = session.id;
+
+    // Best effort update – failure should not block the request.
+    touchSession(session.id).catch(() => undefined);
+
     return next();
   } catch (error) {
-    return res.status(401).json({ message: "Invalid or expired access token." });
+    console.error("Failed to validate session", error);
+    clearSessionCookie(res);
+    return res.status(401).json({ message: "Authentication required." });
   }
 };

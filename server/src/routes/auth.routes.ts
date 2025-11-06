@@ -1,21 +1,20 @@
 import type { Request, Response } from "express";
 import { Router } from "express";
 
-import { REFRESH_TOKEN_COOKIE } from "../constants.js";
-import { getAccessTokenFromRequest, requireAuth } from "../middleware/auth.js";
+import { getSessionTokenFromRequest, requireAuth } from "../middleware/auth.js";
 import { prisma } from "../prisma.js";
 import {
   createSession,
   deleteSessionById,
-  findSessionById,
-  generateSessionId,
-  updateSessionRefreshToken,
-  validateRefreshToken
+  deleteSessionByToken,
+  findSessionWithUserByToken,
+  isSessionExpired,
+  purgeExpiredSessionsForUser,
+  rotateSessionToken
 } from "../services/session.service.js";
 import { getUserWithProfile, serializeUser, userWithProfileSelect } from "../services/user.service.js";
-import { clearAuthCookies, setAuthCookies } from "../utils/cookies.js";
+import { clearSessionCookie, setSessionCookie } from "../utils/cookies.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { signAccessToken, signRefreshToken, verifyAccessToken, verifyRefreshToken } from "../utils/jwt.js";
 import { hashPassword, verifyPassword } from "../utils/password.js";
 import { loginSchema, registerSchema } from "../validators/auth.js";
 
@@ -26,6 +25,16 @@ const validationErrorResponse = (res: Response, error: unknown) =>
     message: "Invalid request payload.",
     error
   });
+
+const issueSessionCookie = async (req: Request, res: Response, userId: string) => {
+  const { token } = await createSession({
+    userId,
+    userAgent: req.headers["user-agent"],
+    ipAddress: req.ip
+  });
+
+  setSessionCookie(res, token);
+};
 
 authRouter.post(
   "/register",
@@ -65,6 +74,7 @@ authRouter.post(
         username,
         email,
         passwordHash,
+        lastLoginAt: new Date(),
         preference: {
           create: {}
         }
@@ -72,30 +82,7 @@ authRouter.post(
       select: userWithProfileSelect
     });
 
-    const sessionId = generateSessionId();
-    const accessToken = signAccessToken({
-      sub: user.id,
-      sessionId,
-      username: user.username,
-      email: user.email,
-      isOnboardingComplete: user.isOnboardingComplete
-    });
-    const refreshToken = signRefreshToken({ sub: user.id, sessionId });
-
-    await createSession({
-      sessionId,
-      userId: user.id,
-      refreshToken,
-      userAgent: req.headers["user-agent"],
-      ipAddress: req.ip
-    });
-
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() }
-    });
-
-    setAuthCookies(res, accessToken, refreshToken);
+    await issueSessionCookie(req, res, user.id);
 
     return res.status(201).json({
       message: "Account created successfully.",
@@ -107,144 +94,97 @@ authRouter.post(
 authRouter.post(
   "/login",
   asyncHandler(async (req: Request, res: Response) => {
-    try {
-      const result = loginSchema.safeParse(req.body);
+    const result = loginSchema.safeParse(req.body);
 
-      if (!result.success) {
-        return validationErrorResponse(res, result.error.flatten());
-      }
-
-      const identifier = result.data.emailOrUsername.trim();
-      const lowered = identifier.toLowerCase();
-
-      const user = await prisma.user.findFirst({
-        where: {
-          OR: [
-            { email: lowered },
-            {
-              username: {
-                equals: identifier,
-                mode: "insensitive"
-              }
-            }
-          ]
-        },
-        select: {
-          ...userWithProfileSelect,
-          passwordHash: true
-        }
-      });
-
-      if (!user) {
-        return res.status(401).json({ message: "Invalid credentials." });
-      }
-
-      const passwordValid = await verifyPassword(result.data.password, user.passwordHash);
-
-      if (!passwordValid) {
-        return res.status(401).json({ message: "Invalid credentials." });
-      }
-
-      const sessionId = generateSessionId();
-      const accessToken = signAccessToken({
-        sub: user.id,
-        sessionId,
-        username: user.username,
-        email: user.email,
-        isOnboardingComplete: user.isOnboardingComplete
-      });
-      const refreshToken = signRefreshToken({ sub: user.id, sessionId });
-
-      await createSession({
-        sessionId,
-        userId: user.id,
-        refreshToken,
-        userAgent: req.headers["user-agent"],
-        ipAddress: req.ip
-      });
-
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { lastLoginAt: new Date() }
-      });
-
-      setAuthCookies(res, accessToken, refreshToken);
-
-      return res.json({
-        message: "Login successful.",
-        user: serializeUser(user)
-      });
-    } catch (error) {
-      console.error("Login error:", error);
-      console.error("Error details:", {
-        message: error instanceof Error ? error.message : "Unknown error",
-        stack: error instanceof Error ? error.stack : undefined,
-        name: error instanceof Error ? error.name : undefined
-      });
-      throw error; // Re-throw to be caught by asyncHandler
+    if (!result.success) {
+      return validationErrorResponse(res, result.error.flatten());
     }
+
+    const identifier = result.data.emailOrUsername.trim();
+    const lowered = identifier.toLowerCase();
+
+    const userRecord = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: lowered },
+          {
+            username: {
+              equals: identifier,
+              mode: "insensitive"
+            }
+          }
+        ]
+      },
+      select: {
+        id: true,
+        passwordHash: true
+      }
+    });
+
+    if (!userRecord) {
+      return res.status(401).json({ message: "Invalid email/username or password." });
+    }
+
+    const isPasswordValid = await verifyPassword(result.data.password, userRecord.passwordHash);
+
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: "Invalid email/username or password." });
+    }
+
+    await purgeExpiredSessionsForUser(userRecord.id);
+
+    const user = await getUserWithProfile(userRecord.id);
+
+    if (!user) {
+      return res.status(500).json({ message: "Failed to fetch user profile after login." });
+    }
+
+    await prisma.user.update({
+      where: { id: userRecord.id },
+      data: { lastLoginAt: new Date() }
+    });
+
+    await issueSessionCookie(req, res, userRecord.id);
+
+    return res.json({
+      message: "Login successful.",
+      user: serializeUser(user)
+    });
   })
 );
 
 authRouter.post(
   "/refresh",
   asyncHandler(async (req: Request, res: Response) => {
-    const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
+    const sessionToken = getSessionTokenFromRequest(req);
 
-    if (!refreshToken) {
-      return res.status(401).json({ message: "Refresh token missing." });
+    if (!sessionToken) {
+      return res.status(401).json({ message: "Session token missing." });
     }
 
-    let payload;
+    const session = await findSessionWithUserByToken(sessionToken);
 
-    try {
-      payload = verifyRefreshToken(refreshToken);
-    } catch (error) {
-      clearAuthCookies(res);
-      return res.status(401).json({ message: "Invalid refresh token." });
-    }
-
-    const session = await findSessionById(payload.sessionId);
-
-    if (!session || session.userId !== payload.sub) {
-      clearAuthCookies(res);
+    if (!session || !session.user) {
+      clearSessionCookie(res);
       return res.status(401).json({ message: "Session not found." });
     }
 
-    if (session.expiresAt.getTime() <= Date.now()) {
+    if (isSessionExpired(session)) {
       await deleteSessionById(session.id);
-      clearAuthCookies(res);
+      clearSessionCookie(res);
       return res.status(401).json({ message: "Session expired." });
     }
 
-    const isValid = await validateRefreshToken(session.refreshToken, refreshToken);
-
-    if (!isValid) {
-      await deleteSessionById(session.id);
-      clearAuthCookies(res);
-      return res.status(401).json({ message: "Refresh token mismatch." });
-    }
+    const { token: rotatedToken } = await rotateSessionToken(session.id);
+    setSessionCookie(res, rotatedToken);
 
     const user = await getUserWithProfile(session.userId);
 
     if (!user) {
       await deleteSessionById(session.id);
-      clearAuthCookies(res);
+      clearSessionCookie(res);
       return res.status(401).json({ message: "User no longer exists." });
     }
-
-    const newAccessToken = signAccessToken({
-      sub: user.id,
-      sessionId: session.id,
-      username: user.username,
-      email: user.email,
-      isOnboardingComplete: user.isOnboardingComplete
-    });
-    const newRefreshToken = signRefreshToken({ sub: user.id, sessionId: session.id });
-
-    await updateSessionRefreshToken(session.id, newRefreshToken);
-
-    setAuthCookies(res, newAccessToken, newRefreshToken);
 
     return res.json({
       message: "Session refreshed.",
@@ -257,20 +197,15 @@ authRouter.post(
   "/logout",
   requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
-    const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
+    const sessionToken = getSessionTokenFromRequest(req);
 
-    if (refreshToken) {
-      try {
-        const payload = verifyRefreshToken(refreshToken);
-        await deleteSessionById(payload.sessionId);
-      } catch {
-        // ignore decoding issues and continue to clear cookies
-      }
+    if (sessionToken) {
+      await deleteSessionByToken(sessionToken);
     } else if (req.sessionId) {
       await deleteSessionById(req.sessionId);
     }
 
-    clearAuthCookies(res);
+    clearSessionCookie(res);
 
     return res.status(204).send();
   })
@@ -279,27 +214,31 @@ authRouter.post(
 authRouter.get(
   "/me",
   asyncHandler(async (req: Request, res: Response) => {
-    const token = getAccessTokenFromRequest(req);
+    const sessionToken = getSessionTokenFromRequest(req);
 
-    if (!token) {
+    if (!sessionToken) {
       return res.json({ user: null });
     }
 
-    try {
-      const payload = verifyAccessToken(token);
+    const session = await findSessionWithUserByToken(sessionToken);
 
-      const user = await getUserWithProfile(payload.sub);
-
-      if (!user) {
-        clearAuthCookies(res);
-        return res.json({ user: null });
+    if (!session || !session.user || isSessionExpired(session)) {
+      if (session) {
+        await deleteSessionById(session.id);
       }
-
-      return res.json({ user: serializeUser(user) });
-    } catch (error) {
-      clearAuthCookies(res);
+      clearSessionCookie(res);
       return res.json({ user: null });
     }
+
+    const user = await getUserWithProfile(session.userId);
+
+    if (!user) {
+      await deleteSessionById(session.id);
+      clearSessionCookie(res);
+      return res.json({ user: null });
+    }
+
+    return res.json({ user: serializeUser(user) });
   })
 );
 
