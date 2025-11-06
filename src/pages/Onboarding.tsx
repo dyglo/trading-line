@@ -13,9 +13,9 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
-import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/providers/AuthProvider";
 import type { ApiOnboardingQuestion, OnboardingSubmissionPayload } from "@/types/api";
+import { fetchOnboardingQuestions } from "@/supabase/profile";
 
 interface ResponseDraft {
   optionIds: string[];
@@ -80,10 +80,7 @@ const Onboarding = () => {
 
   const { data: questions, isLoading } = useQuery({
     queryKey: ["onboarding", "questions"],
-    queryFn: async () => {
-      const response = await api.get<{ questions: ApiOnboardingQuestion[] }>("/onboarding/questions");
-      return response.questions;
-    }
+    queryFn: fetchOnboardingQuestions
   });
 
   const [responses, setResponses] = useState<Record<string, ResponseDraft>>(() => {
@@ -208,14 +205,10 @@ const Onboarding = () => {
         title: "Onboarding complete",
         description: "Your dashboard is calibrated - let's trade."
       });
-      if (updatedUser.isOnboardingComplete) {
-        navigate("/dashboard", { replace: true });
-      }
+      // Navigate regardless; route guards will keep users on onboarding if not fully complete
+      navigate("/dashboard", { replace: true });
     } catch (error) {
-      const message =
-        error instanceof ApiError
-          ? error.body?.message ?? error.message
-          : "We could not save your answers. Please try again.";
+      const message = error instanceof Error ? error.message : "We could not save your answers. Please try again.";
       toast({
         title: "Something went wrong",
         description: message,

@@ -1,10 +1,19 @@
-import { createContext, useContext, useMemo, useCallback } from "react";
+import { createContext, useContext, useMemo, useCallback, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { api, ApiError } from "@/lib/api";
+import {
+  getCurrentUserProfile,
+  loginWithSupabase,
+  logoutFromSupabase,
+  registerWithSupabase,
+  resetBalance as resetBalanceRequest,
+  submitOnboardingResponses,
+  updatePreferences as updatePreferencesRequest,
+  updateProfileDetails
+} from "@/supabase/profile";
+import { supabase } from "@/supabase/client";
 import type {
   ApiUser,
-  AuthResponse,
   LoginPayload,
   OnboardingSubmissionPayload,
   RegisterPayload,
@@ -29,6 +38,7 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 const authQueryKey = ["auth", "me"] as const;
+const onboardingQueryKey = ["onboarding", "questions"] as const;
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const queryClient = useQueryClient();
@@ -48,66 +58,73 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     [queryClient, setUser]
   );
 
-  const ensureUser = (response: AuthResponse) => {
-    if (!response.user) {
-      throw new Error(response.message ?? "Unexpected empty response.");
-    }
-    return response.user;
-  };
-
   const meQuery = useQuery<ApiUser | null>({
     queryKey: authQueryKey,
-    queryFn: async () => {
-      try {
-        const response = await api.get<AuthResponse>("/auth/me");
-        return response.user;
-      } catch (error) {
-        if (error instanceof ApiError && error.status === 401) {
-          return null;
-        }
-        throw error;
-      }
-    },
+    queryFn: getCurrentUserProfile,
     initialData: null,
     retry: false,
     refetchOnWindowFocus: false,
     staleTime: 1000 * 60
   });
 
+  useEffect(() => {
+    const { data: subscription } = supabase.auth.onAuthStateChange(async (event) => {
+      // Only invalidate on meaningful session-changing events to avoid refetch loops
+      if (
+        event === "SIGNED_IN" ||
+        event === "SIGNED_OUT" ||
+        event === "TOKEN_REFRESHED" ||
+        event === "USER_UPDATED"
+      ) {
+        await queryClient.invalidateQueries({ queryKey: authQueryKey });
+        await queryClient.invalidateQueries({ queryKey: onboardingQueryKey });
+      }
+    });
+
+    return () => {
+      subscription?.subscription.unsubscribe();
+    };
+  }, [queryClient]);
+
   const loginMutation = useMutation({
-    mutationFn: async (payload: LoginPayload) => {
-      const response = await api.post<AuthResponse>("/auth/login", payload);
-      return ensureUser(response);
-    },
+    mutationFn: loginWithSupabase,
     onSuccess: async (user) => {
       await applyUser(user);
     }
   });
 
   const registerMutation = useMutation({
-    mutationFn: async (payload: RegisterPayload) => {
-      const response = await api.post<AuthResponse>("/auth/register", payload);
-      return ensureUser(response);
-    },
+    mutationFn: registerWithSupabase,
     onSuccess: async (user) => {
       await applyUser(user);
     }
   });
 
   const logoutMutation = useMutation({
-    mutationFn: async () => {
-      await api.post("/auth/logout");
-    },
+    mutationFn: logoutFromSupabase,
     onSuccess: async () => {
       await applyUser(null);
       queryClient.removeQueries({ queryKey: authQueryKey, exact: true });
+      queryClient.invalidateQueries({ queryKey: onboardingQueryKey });
     }
   });
 
   const refreshMutation = useMutation({
     mutationFn: async () => {
-      const response = await api.post<AuthResponse>("/auth/refresh");
-      return ensureUser(response);
+      const {
+        data: { session },
+        error
+      } = await supabase.auth.refreshSession();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (!session?.user) {
+        throw new Error("Session refresh failed.");
+      }
+
+      return (await getCurrentUserProfile())!;
     },
     onSuccess: async (user) => {
       await applyUser(user);
@@ -115,42 +132,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   });
 
   const updateProfileMutation = useMutation({
-    mutationFn: async (payload: UpdateProfilePayload) => {
-      const response = await api.patch<AuthResponse>("/profile", payload);
-      return ensureUser(response);
-    },
+    mutationFn: updateProfileDetails,
     onSuccess: async (user) => {
       await applyUser(user);
     }
   });
 
   const updatePreferencesMutation = useMutation({
-    mutationFn: async (payload: UpdatePreferencesPayload) => {
-      const response = await api.patch<AuthResponse>("/profile/preferences", payload);
-      return ensureUser(response);
-    },
+    mutationFn: updatePreferencesRequest,
     onSuccess: async (user) => {
       await applyUser(user);
     }
   });
 
   const resetBalanceMutation = useMutation({
-    mutationFn: async () => {
-      const response = await api.post<AuthResponse>("/profile/preferences/reset");
-      return ensureUser(response);
-    },
+    mutationFn: resetBalanceRequest,
     onSuccess: async (user) => {
       await applyUser(user);
     }
   });
 
   const onboardingMutation = useMutation({
-    mutationFn: async (payload: OnboardingSubmissionPayload) => {
-      const response = await api.post<AuthResponse>("/onboarding/submit", payload);
-      return ensureUser(response);
-    },
+    mutationFn: submitOnboardingResponses,
     onSuccess: async (user) => {
       await applyUser(user);
+      queryClient.invalidateQueries({ queryKey: onboardingQueryKey });
     }
   });
 
@@ -163,7 +169,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     () => ({
       user: meQuery.data ?? null,
       isAuthenticated: Boolean(meQuery.data),
-      isLoading: meQuery.isLoading || meQuery.isFetching,
+      isLoading: meQuery.isLoading,
       login: loginMutation.mutateAsync,
       register: registerMutation.mutateAsync,
       logout: logoutMutation.mutateAsync,

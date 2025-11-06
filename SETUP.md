@@ -6,7 +6,6 @@
 
 ```bash
 npm install
-cd server && npm install && cd ..
 ```
 
 ### 2. Configure Environment Variables
@@ -14,75 +13,57 @@ cd server && npm install && cd ..
 Create a `.env` file in the project root with the following variables:
 
 ```env
-# Database (Required)
-DATABASE_URL=postgresql://user:password@host:port/database?sslmode=require
-
-# Server Configuration (Optional)
-NODE_ENV=development
-PORT=4000
-
-# Session Settings (Optional - defaults shown)
-SESSION_TOKEN_TTL_DAYS=30
-SESSION_COOKIE_NAME=tline_session_token
-
-# Cookie Configuration (Optional)
-COOKIE_SECURE=false
-# COOKIE_DOMAIN=
-
-# CORS Configuration (Optional - defaults to http://localhost:8080)
-CORS_ORIGIN=http://localhost:8080
+VITE_SUPABASE_URL=https://your-project-ref.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
 
 ### 3. Start Development Servers
 
-Run the single dev command, which now starts both Vite and the API server together:
+Run the dev server:
 
 ```bash
 npm run dev
 ```
 
-The frontend will be available on `http://localhost:8080` and the API on `http://localhost:4000` (proxied automatically).
+The app will be available on `http://localhost:8080`.
 
 ### 4. Verify Setup
 
-1. Frontend should be accessible at `http://localhost:8080`
-2. Backend health check: `http://localhost:4000/healthz`
-3. Try logging in - authentication should work!
+1. App should be accessible at `http://localhost:8080`
+2. Register or sign in with a Supabase auth user
+3. Complete the onboarding flow to verify database connectivity
+
+## Supabase Schema & Policies
+
+1. Open the Supabase SQL editor and run the statements in `supabase/schema.sql`
+2. Seed the onboarding catalog with `supabase/seed_onboarding.sql` (you can re-run to update copy)
+3. Confirm Row Level Security policies exist for every table before inviting collaborators
 
 ## Troubleshooting
 
-### Error: "ECONNREFUSED" or "Failed to load resource"
+### Supabase auth issues
 
-This means the backend server is not running. Make sure you've started the backend server with `npm run dev:server` in a separate terminal.
+- Ensure the Supabase project has email/password signups enabled
+- Check the policy on the `profiles` table so new users can insert their row (`auth.uid() = id`)
 
-### Error: "Environment validation failed"
+### Missing onboarding questions
 
-This means you're missing required environment variables. Make sure your `.env` file has at least:
-- `DATABASE_URL`
-
-### Error: "500 Internal Server Error"
-
-Check the backend server logs for detailed error messages. The improved error handling will show you exactly what's missing.
+- Seed the `onboarding_questions` and `onboarding_options` tables in Supabase
+- Confirm RLS policies allow authenticated users to select rows
 
 ## Production Deployment (Vercel)
 
 ### Required Environment Variables in Vercel:
 
-1. `DATABASE_URL` - Your PostgreSQL connection string (Render, Neon, Supabase, etc.)
-2. `NODE_ENV` - Set to `production`
-3. `COOKIE_SECURE` - Set to `true`
+1. `VITE_SUPABASE_URL` - Supabase project URL
+2. `VITE_SUPABASE_ANON_KEY` - Supabase anon key
 
 ### Optional Environment Variables:
 
-- `CORS_ORIGIN` - Leave unset (will allow all origins in production)
-- `COOKIE_DOMAIN` - Leave unset (correct for Vercel)
-- `SESSION_TOKEN_TTL_DAYS` - Optional (default: 30 days)
-- `SESSION_COOKIE_NAME` - Optional (default: `tline_session_token`)
+- Analytics, feature flags, or logging tokens you configure separately
 
 ## Notes
 
 - Never commit your `.env` file to version control
-- You no longer need to manage JWT secrets—the API issues hashed, database-backed session cookies automatically
-- The backend must be running for the frontend to work locally
-- In production (Vercel), the API runs as serverless functions, so you don't need to start a separate server
-
+- Supabase hosts both authentication and database storage—ensure RLS policies cover every table
+- For local dev, you can use the Supabase Dashboard SQL editor to seed data quickly

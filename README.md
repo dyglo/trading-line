@@ -240,7 +240,7 @@ The app supports both dark and light themes:
 
 ### Available Scripts
 
-- `npm run dev` - Start frontend + API development servers together
+- `npm run dev` - Start the Vite development server
 - `npm run build` - Build for production
 - `npm run build:dev` - Build in development mode
 - `npm run preview` - Preview production build
@@ -248,11 +248,15 @@ The app supports both dark and light themes:
 
 ### Environment Variables
 
-- `VITE_API_URL` should remain `/api` in production so the SPA and the serverless API share the same origin on Vercel.
-- `DATABASE_URL` must point at the Render Postgres instance and include `sslmode=require`.
-- `SESSION_TOKEN_TTL_DAYS` is optional (defaults to 30) if you want to shorten or extend the authenticated session lifetime.
-- `CORS_ORIGIN` accepts a comma-separated list (for example `http://localhost:8080,https://your-production-domain.vercel.app`) or `*` to reflect the inbound origin.
-- Set `COOKIE_SECURE=true` in production to ensure auth cookies are transmitted over HTTPS only.
+- `VITE_SUPABASE_URL` - Supabase project URL (e.g. `https://xyzcompany.supabase.co`)
+- `VITE_SUPABASE_ANON_KEY` - Supabase anon key used by the browser client
+- Configure Row Level Security in Supabase so authenticated users can read/update their own profile, preferences, and onboarding responses
+
+### Supabase Setup
+
+1. Run the SQL in `supabase/schema.sql` to create tables, relationships, and RLS policies.
+2. Seed the onboarding catalog with `supabase/seed_onboarding.sql`.
+3. Enable email/password auth inside Supabase and verify new users can insert into `profiles`, `preferences`, and `onboarding_responses`.
 
 ### Code Style
 

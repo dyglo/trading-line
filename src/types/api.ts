@@ -60,11 +60,6 @@ export interface ApiUser {
   onboardingResponses: ApiOnboardingResponse[];
 }
 
-export interface AuthResponse {
-  message?: string;
-  user: ApiUser | null;
-}
-
 export interface LoginPayload {
   emailOrUsername: string;
   password: string;
@@ -95,11 +90,4 @@ export interface OnboardingSubmissionPayload {
     optionIds?: string[];
     freeText?: string;
   }>;
-}
-
-export interface ApiErrorBody {
-  message?: string;
-  error?: unknown;
-  details?: unknown;
-  errors?: Record<string, string[]>;
 }
