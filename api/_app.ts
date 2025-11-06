@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,7 +20,12 @@ if (!expressApp) {
   throw new Error("Failed to load Express app for serverless handler.");
 }
 
-const handler = (req: Parameters<Express["handle"]>[0], res: Parameters<Express["handle"]>[1]) => expressApp(req, res);
+type ExpressHandler = (req: Request, res: Response) => void;
+const handler: ExpressHandler = (req, res) => {
+  // The Express app is a request listener compatible with Node/Vercel.
+  // Casts ensure TS compatibility while runtime behavior remains correct.
+  return (expressApp as unknown as (req: Request, res: Response) => void)(req, res);
+};
 
 export const app = expressApp;
 export default handler;
