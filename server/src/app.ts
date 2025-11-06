@@ -1,5 +1,5 @@
 import cookieParser from "cookie-parser";
-import cors from "cors";
+import cors, { type CorsOptions } from "cors";
 import type { NextFunction, Request, Response } from "express";
 import express from "express";
 import helmet from "helmet";
@@ -22,12 +22,16 @@ export const createApp = () => {
   // This is required for req.ip to work correctly in production
   app.set("trust proxy", 1);
 
-  app.use(
-    cors({
-      origin: env.cors.origin,
-      credentials: true
-    })
-  );
+  const corsOptions: CorsOptions = {
+    origin: env.cors.origin,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    optionsSuccessStatus: 204
+  };
+
+  app.use(cors(corsOptions));
+  app.options("*", cors(corsOptions));
   app.use(
     helmet({
       crossOriginResourcePolicy: { policy: "cross-origin" }
