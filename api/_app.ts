@@ -1,4 +1,5 @@
 import { createServer } from 'http';
+import type { IncomingMessage, ServerResponse } from 'http';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,7 +27,7 @@ if (!expressApp) {
 const server = createServer(expressApp);
 
 // Vercel serverless function handler
-export default async function handler(req: any, res: any) {
+export default async function handler(req: IncomingMessage, res: ServerResponse) {
   // Set request start time for logging
   const start = Date.now();
   
