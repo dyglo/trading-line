@@ -5,11 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "prisma generate --schema server/prisma/schema.prisma && vite build",
+    "dev:server": "cd server && npm run dev",
+    "generate-secrets": "node generate-secrets.js",
+    "build": "npm run prisma:generate && npm run build:server && vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "postinstall": "prisma generate --schema server/prisma/schema.prisma"
+    "postinstall": "npm run prisma:generate",
+    "build:server": "tsc --project server/tsconfig.json",
+    "prisma:generate": "prisma generate --schema server/prisma/schema.prisma"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

@@ -49,8 +49,26 @@ const envSchema = z.object({
 const parsed = envSchema.safeParse(process.env);
 
 if (!parsed.success) {
-  console.error("Invalid environment configuration", parsed.error.flatten().fieldErrors);
-  throw new Error("Environment validation failed. Please check your .env file.");
+  const errors = parsed.error.flatten().fieldErrors;
+  console.error("=== ENVIRONMENT CONFIGURATION ERROR ===");
+  console.error("Missing or invalid environment variables:");
+  Object.entries(errors).forEach(([key, messages]) => {
+    console.error(`  - ${key}: ${messages?.join(", ") ?? "Invalid"}`);
+  });
+  console.error("\nRequired environment variables:");
+  console.error("  - DATABASE_URL: PostgreSQL connection string");
+  console.error("  - JWT_ACCESS_SECRET: Random 32+ character string");
+  console.error("  - JWT_REFRESH_SECRET: Random 32+ character string (different from access secret)");
+  console.error("\nOptional environment variables:");
+  console.error("  - NODE_ENV: development | production | test (default: development)");
+  console.error("  - PORT: Server port (default: 4000)");
+  console.error("  - ACCESS_TOKEN_EXPIRES_IN: Access token expiry in seconds (default: 900)");
+  console.error("  - REFRESH_TOKEN_EXPIRES_IN: Refresh token expiry in seconds (default: 604800)");
+  console.error("  - COOKIE_SECURE: true | false (default: true in production)");
+  console.error("  - COOKIE_DOMAIN: Cookie domain (optional, leave unset for Vercel)");
+  console.error("  - CORS_ORIGIN: Comma-separated origins or * (default: http://localhost:8080)");
+  console.error("=======================================");
+  throw new Error("Environment validation failed. Please check your .env file and add the missing variables.");
 }
 
 const accessTokenExpiresIn = parsed.data.ACCESS_TOKEN_EXPIRES_IN
@@ -60,8 +78,13 @@ const refreshTokenExpiresIn = parsed.data.REFRESH_TOKEN_EXPIRES_IN
   ? Number.parseInt(parsed.data.REFRESH_TOKEN_EXPIRES_IN, 10)
   : 60 * 60 * 24 * 7; // 7 days
 
-const parseCorsOrigin = (value?: string) => {
+const parseCorsOrigin = (value?: string, nodeEnv?: string) => {
   if (!value) {
+    // In production, if CORS_ORIGIN is not set, allow same-origin requests
+    // This works for Vercel where frontend and API share the same domain
+    if (nodeEnv === "production") {
+      return true as const; // Allow all origins in production if not specified (for Vercel)
+    }
     return ["http://localhost:8080"];
   }
 
@@ -90,6 +113,6 @@ export const env = {
     domain: parsed.data.COOKIE_DOMAIN
   },
   cors: {
-    origin: parseCorsOrigin(parsed.data.CORS_ORIGIN)
+    origin: parseCorsOrigin(parsed.data.CORS_ORIGIN, parsed.data.NODE_ENV)
   }
 };

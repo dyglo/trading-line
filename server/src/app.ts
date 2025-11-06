@@ -15,6 +15,10 @@ export const createApp = () => {
 
   app.disable("x-powered-by");
 
+  // Trust proxy for Vercel serverless functions
+  // This is required for req.ip to work correctly in production
+  app.set("trust proxy", 1);
+
   app.use(
     cors({
       origin: env.cors.origin,

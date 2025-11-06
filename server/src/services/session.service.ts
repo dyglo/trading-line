@@ -15,9 +15,16 @@ interface CreateSessionParams {
 export const generateSessionId = () => randomUUID();
 
 const calculateRefreshExpiry = () => {
+  // env.jwt.refreshTokenExpiresIn is already a number (in seconds)
   const expiresInSeconds = typeof env.jwt.refreshTokenExpiresIn === 'number' 
     ? env.jwt.refreshTokenExpiresIn 
     : Number.parseInt(String(env.jwt.refreshTokenExpiresIn), 10);
+  
+  if (isNaN(expiresInSeconds) || expiresInSeconds <= 0) {
+    // Default to 7 days if invalid
+    return new Date(Date.now() + 60 * 60 * 24 * 7 * 1000);
+  }
+  
   return new Date(Date.now() + expiresInSeconds * 1000);
 };
 
