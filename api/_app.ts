@@ -1,31 +1,49 @@
-import { existsSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
-
-import type { Express, Request, Response } from "express";
+import { createServer } from 'http';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { Express } from 'express';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const distPath = path.join(__dirname, "../server/dist/app.js");
-const srcPath = path.join(__dirname, "../server/src/app.ts");
+// Try to load the built version first, fallback to TypeScript source
+const distPath = path.join(__dirname, '../server/dist/app.js');
+const srcPath = path.join(__dirname, '../server/src/app.ts');
+const appPath = existsSync(distPath) ? distPath : srcPath;
 
-const moduleUrl = existsSync(distPath) ? pathToFileURL(distPath).href : pathToFileURL(srcPath).href;
+// Import the app module
+const appModule = await import(appPath);
 
-const imported = await import(moduleUrl);
-
-const expressApp: Express | undefined = (imported as { app?: Express; default?: Express }).app ?? imported.default;
+// Get the Express app (supports both default and named exports)
+const expressApp: Express = appModule.app || appModule.default;
 
 if (!expressApp) {
-  throw new Error("Failed to load Express app for serverless handler.");
+  throw new Error('Failed to load Express app. Ensure your app is properly exported.');
 }
 
-type ExpressHandler = (req: Request, res: Response) => void;
-const handler: ExpressHandler = (req, res) => {
-  // The Express app is a request listener compatible with Node/Vercel.
-  // Casts ensure TS compatibility while runtime behavior remains correct.
-  return (expressApp as unknown as (req: Request, res: Response) => void)(req, res);
-};
+// Create HTTP server for Vercel
+const server = createServer(expressApp);
 
+// Vercel serverless function handler
+export default async function handler(req: any, res: any) {
+  // Set request start time for logging
+  const start = Date.now();
+  
+  // Log incoming requests in production
+  if (process.env.NODE_ENV === 'production') {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  }
+  
+  // Handle the request with Express
+  expressApp(req, res);
+  
+  // Log completed requests
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} - ${res.statusCode} (${duration}ms)`);
+  });
+}
+
+// Export the Express app for direct usage
 export const app = expressApp;
-export default handler;
