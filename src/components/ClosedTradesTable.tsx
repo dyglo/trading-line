@@ -1,4 +1,4 @@
-import { useTradingStore } from '@/store/tradingStore';
+import { useTradingStore, type Trade } from '@/store/tradingStore';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -8,6 +8,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+
+const formatTradeSize = (trade: Trade) => {
+  if (trade.sizingMode === 'LOTS') {
+    const lots = trade.lotSize ?? (trade.contractSize ? trade.qty / trade.contractSize : 0);
+    return `${lots.toFixed(2)} ${lots === 1 ? 'lot' : 'lots'}`;
+  }
+
+  return trade.qty.toLocaleString();
+};
 
 export const ClosedTradesTable = () => {
   const trades = useTradingStore((state) => state.trades);
@@ -48,7 +57,7 @@ export const ClosedTradesTable = () => {
                         {trade.side}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right">{trade.qty}</TableCell>
+                    <TableCell className="text-right">{formatTradeSize(trade)}</TableCell>
                     <TableCell className="text-right">${trade.avgPrice.toFixed(2)}</TableCell>
                     <TableCell className={`text-right font-medium ${isPositive ? 'text-long' : 'text-short'}`}>
                       {isPositive ? '+' : ''}${trade.pnl.toFixed(2)}

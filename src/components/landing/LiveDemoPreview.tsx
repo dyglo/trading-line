@@ -299,7 +299,10 @@ export const LiveDemoPreview = () => {
                           </Badge>
                           <span className="font-medium text-foreground">{trade.symbol}</span>
                           <span className="text-sm text-foreground/60">
-                            {trade.qty} @ ${trade.avgPrice.toFixed(2)}
+                            {trade.sizingMode === 'LOTS'
+                              ? `${(trade.lotSize ?? 0).toFixed(2)} lot${(trade.lotSize ?? 0) === 1 ? '' : 's'}`
+                              : trade.qty.toLocaleString()}
+                            {' '}@ ${trade.avgPrice.toFixed(2)}
                           </span>
                         </div>
                         <span className={`font-semibold ${isPositive ? 'text-long' : 'text-short'}`}>

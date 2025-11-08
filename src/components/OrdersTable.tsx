@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
-import { useTradingStore, Order } from '@/store/tradingStore';
+import { useTradingStore, type Order } from '@/store/tradingStore';
 import {
   Table,
   TableBody,
@@ -11,6 +11,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+
+const formatOrderSize = (order: Order) => {
+  if (order.sizingMode === 'LOTS') {
+    const lots = order.displayQty ?? order.qty / (order.contractSize ?? 100_000);
+    return `${lots.toFixed(2)} ${lots === 1 ? 'lot' : 'lots'}`;
+  }
+
+  return order.qty.toLocaleString();
+};
 
 export const OrdersTable = () => {
   const orders = useTradingStore((state) => state.orders);
@@ -53,7 +62,7 @@ export const OrdersTable = () => {
                     </Badge>
                   </TableCell>
                   <TableCell>{order.type}</TableCell>
-                  <TableCell className="text-right">{order.qty}</TableCell>
+                  <TableCell className="text-right">{formatOrderSize(order)}</TableCell>
                   <TableCell className="text-right">
                     {order.limitPrice?.toFixed(2) || order.stopPrice?.toFixed(2) || 'Market'}
                   </TableCell>

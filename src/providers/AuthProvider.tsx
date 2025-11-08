@@ -2,9 +2,11 @@ import { createContext, useContext, useMemo, useCallback, useEffect } from "reac
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
+  activateSubscription as activateSubscriptionRequest,
   getCurrentUserProfile,
   loginWithSupabase,
   logoutFromSupabase,
+  markStopOutStatus as markStopOutStatusRequest,
   registerWithSupabase,
   resetBalance as resetBalanceRequest,
   submitOnboardingResponses,
@@ -13,6 +15,7 @@ import {
 } from "@/supabase/profile";
 import { supabase } from "@/supabase/client";
 import type {
+  ActivateSubscriptionPayload,
   ApiUser,
   LoginPayload,
   OnboardingSubmissionPayload,
@@ -32,6 +35,8 @@ interface AuthContextValue {
   updateProfile: (payload: UpdateProfilePayload) => Promise<ApiUser>;
   updatePreferences: (payload: UpdatePreferencesPayload) => Promise<ApiUser>;
   resetBalance: () => Promise<ApiUser>;
+  activateSubscription: (payload: ActivateSubscriptionPayload) => Promise<ApiUser>;
+  markStopOut: (balance: number) => Promise<ApiUser>;
   submitOnboarding: (payload: OnboardingSubmissionPayload) => Promise<ApiUser>;
   refetch: () => Promise<ApiUser | null>;
 }
@@ -152,6 +157,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   });
 
+  const activateSubscriptionMutation = useMutation({
+    mutationFn: activateSubscriptionRequest,
+    onSuccess: async (user) => {
+      await applyUser(user);
+    }
+  });
+
+  const markStopOutMutation = useMutation({
+    mutationFn: markStopOutStatusRequest,
+    onSuccess: async (user) => {
+      await applyUser(user);
+    }
+  });
+
   const onboardingMutation = useMutation({
     mutationFn: submitOnboardingResponses,
     onSuccess: async (user) => {
@@ -177,6 +196,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       updateProfile: updateProfileMutation.mutateAsync,
       updatePreferences: updatePreferencesMutation.mutateAsync,
       resetBalance: resetBalanceMutation.mutateAsync,
+      activateSubscription: activateSubscriptionMutation.mutateAsync,
+      markStopOut: markStopOutMutation.mutateAsync,
       submitOnboarding: onboardingMutation.mutateAsync,
       refetch
     }),
@@ -192,6 +213,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       updateProfileMutation.mutateAsync,
       updatePreferencesMutation.mutateAsync,
       resetBalanceMutation.mutateAsync,
+      activateSubscriptionMutation.mutateAsync,
+      markStopOutMutation.mutateAsync,
       onboardingMutation.mutateAsync
     ]
   );

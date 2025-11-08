@@ -6,7 +6,14 @@ import { ThemeProvider } from "next-themes";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { GuestRoute, OnboardingRoute, ProtectedRoute } from "@/components/auth/RouteGuards";
-import Dashboard from "./pages/Dashboard";
+import { DashboardLayout } from "./layouts/DashboardLayout";
+import Overview from "./pages/dashboard/Overview";
+import PerformanceAnalytics from "./pages/dashboard/PerformanceAnalytics";
+import TradeHistory from "./pages/dashboard/TradeHistory";
+import StrategyBuilder from "./pages/dashboard/StrategyBuilder";
+import Wallets from "./pages/dashboard/Wallets";
+import Subscription from "./pages/dashboard/Subscription";
+import CustomReports from "./pages/dashboard/CustomReports";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
@@ -35,7 +42,16 @@ const App = () => (
                 <Route path="/onboarding" element={<Onboarding />} />
               </Route>
               <Route element={<ProtectedRoute requireOnboarding />}>
-                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/dashboard" element={<DashboardLayout />}>
+                  <Route index element={<Overview />} />
+                  <Route path="overview" element={<Overview />} />
+                  <Route path="analytics" element={<PerformanceAnalytics />} />
+                  <Route path="trade-history" element={<TradeHistory />} />
+                  <Route path="reports" element={<CustomReports />} />
+                  <Route path="strategy-builder" element={<StrategyBuilder />} />
+                  <Route path="wallets" element={<Wallets />} />
+                  <Route path="subscription" element={<Subscription />} />
+                </Route>
                 <Route path="/profile" element={<Profile />} />
               </Route>
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

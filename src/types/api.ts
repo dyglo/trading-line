@@ -1,5 +1,8 @@
 export type OnboardingQuestionType = "SINGLE_SELECT" | "MULTI_SELECT" | "FREE_TEXT";
 
+export type SubscriptionTier = "COMMUNITY" | "PRO" | "ULTIMATE";
+export type AccountStatus = "ACTIVE" | "STOPPED_OUT";
+
 export interface ApiOnboardingOption {
   id: string;
   label: string;
@@ -24,6 +27,11 @@ export interface ApiUserPreference {
   baseCurrency: string;
   autoResetOnStopOut: boolean;
   notificationsEnabled: boolean;
+  subscriptionTier: SubscriptionTier;
+  accountStatus: AccountStatus;
+  stopOutThreshold: string;
+  lastStopOutAt: string | null;
+  subscriptionExpiresAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -84,10 +92,37 @@ export interface UpdatePreferencesPayload {
   notificationsEnabled?: boolean;
 }
 
+export interface ActivateSubscriptionPayload {
+  tier: Exclude<SubscriptionTier, "COMMUNITY">;
+  durationDays?: number;
+}
+
 export interface OnboardingSubmissionPayload {
   responses: Array<{
     questionId: string;
     optionIds?: string[];
     freeText?: string;
   }>;
+}
+
+export type StrategyMode = "GUI" | "SCRIPTING";
+export type StrategyMessageRole = "assistant" | "user";
+
+export interface ApiStrategy {
+  id: string;
+  userId: string;
+  name: string;
+  mode: StrategyMode;
+  code: string;
+  autosaveEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ApiStrategyMessage {
+  id: string;
+  strategyId: string;
+  role: StrategyMessageRole;
+  content: string;
+  createdAt: string;
 }

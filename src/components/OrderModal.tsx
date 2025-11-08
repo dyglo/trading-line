@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Dialog,
@@ -21,6 +21,8 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useTradingStore, Side, OrderType } from '@/store/tradingStore';
 import { SymbolSearch } from './SymbolSearch';
 import { toast } from 'sonner';
+import { SYMBOLS } from '@/lib/symbols';
+import { useRealTimeQuote } from '@/hooks/useRealTimeQuote';
 
 interface OrderModalProps {
   open: boolean;
@@ -29,7 +31,7 @@ interface OrderModalProps {
 
 export const OrderModal = ({ open, onOpenChange }: OrderModalProps) => {
   const placeOrder = useTradingStore((state) => state.placeOrder);
-  
+
   const [side, setSide] = useState<Side>('LONG');
   const [symbol, setSymbol] = useState('AAPL');
   const [orderType, setOrderType] = useState<OrderType>('MARKET');
@@ -39,35 +41,45 @@ export const OrderModal = ({ open, onOpenChange }: OrderModalProps) => {
   const [takeProfit, setTakeProfit] = useState('');
   const [stopLoss, setStopLoss] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const selectedSymbol = useMemo(
+    () => SYMBOLS.find((entry) => entry.symbol === symbol),
+    [symbol]
+  );
+  const isForex = selectedSymbol?.category === 'forex';
+  const quote = useRealTimeQuote(symbol);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const qtyNum = parseInt(qty);
-    if (isNaN(qtyNum) || qtyNum <= 0) {
-      toast.error('Invalid quantity');
+    const qtyNum = parseFloat(qty);
+    if (!Number.isFinite(qtyNum) || qtyNum <= 0) {
+      toast.error('Invalid position size');
       return;
     }
 
-    placeOrder({
-      symbol,
-      side,
-      type: orderType,
-      qty: qtyNum,
-      limitPrice: limitPrice ? parseFloat(limitPrice) : undefined,
-      stopPrice: stopPrice ? parseFloat(stopPrice) : undefined,
-      takeProfit: takeProfit ? parseFloat(takeProfit) : undefined,
-      stopLoss: stopLoss ? parseFloat(stopLoss) : undefined,
-    });
+    try {
+      await placeOrder({
+        symbol,
+        side,
+        type: orderType,
+        qty: qtyNum,
+        limitPrice: limitPrice ? parseFloat(limitPrice) : undefined,
+        stopPrice: stopPrice ? parseFloat(stopPrice) : undefined,
+        takeProfit: takeProfit ? parseFloat(takeProfit) : undefined,
+        stopLoss: stopLoss ? parseFloat(stopLoss) : undefined,
+      });
 
-    toast.success(`${side} order placed for ${qty} ${symbol}`);
-    onOpenChange(false);
+      toast.success(`${side} ${isForex ? `${qtyNum} lot` : qtyNum} ${symbol} order placed`);
+      onOpenChange(false);
 
-    // Reset form
-    setQty('1');
-    setLimitPrice('');
-    setStopPrice('');
-    setTakeProfit('');
-    setStopLoss('');
+      setQty(isForex ? '0.10' : '1');
+      setLimitPrice('');
+      setStopPrice('');
+      setTakeProfit('');
+      setStopLoss('');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to place order');
+    }
   };
 
   return (
@@ -112,6 +124,14 @@ export const OrderModal = ({ open, onOpenChange }: OrderModalProps) => {
             <div className="space-y-2">
               <Label htmlFor="symbol">Symbol</Label>
               <SymbolSearch value={symbol} onValueChange={setSymbol} />
+              <p className="text-xs text-muted-foreground">
+                Live price:{" "}
+                {quote.price ? (
+                  <span className="font-semibold text-emerald-400">${quote.price.toFixed(quote.price > 200 ? 2 : 4)}</span>
+                ) : (
+                  "Loading..."
+                )}
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -130,11 +150,12 @@ export const OrderModal = ({ open, onOpenChange }: OrderModalProps) => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="qty">Quantity</Label>
+                <Label htmlFor="qty">{isForex ? 'Lot Size' : 'Quantity'}</Label>
                 <Input
                   id="qty"
                   type="number"
-                  min="1"
+                  min={isForex ? '0.01' : '1'}
+                  step={isForex ? '0.01' : '1'}
                   value={qty}
                   onChange={(e) => setQty(e.target.value)}
                   required

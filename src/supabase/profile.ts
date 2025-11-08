@@ -8,6 +8,7 @@ import type {
 import { supabase } from "./client";
 
 import type {
+  ActivateSubscriptionPayload,
   ApiOnboardingQuestion,
   ApiOnboardingResponse,
   ApiOnboardingOption,
@@ -16,11 +17,20 @@ import type {
   LoginPayload,
   OnboardingSubmissionPayload,
   RegisterPayload,
+  SubscriptionTier,
   UpdatePreferencesPayload,
   UpdateProfilePayload
 } from "@/types/api";
 
-const DEFAULT_BALANCE = 10_000;
+const DEFAULT_BALANCE = 1_000;
+const BALANCE_CAPS: Record<SubscriptionTier, number> = {
+  COMMUNITY: 1_000,
+  PRO: 25_000,
+  ULTIMATE: 1_000_000
+};
+const DEFAULT_STOP_OUT_THRESHOLD = 200;
+
+const getBalanceCap = (tier: SubscriptionTier): number => BALANCE_CAPS[tier] ?? BALANCE_CAPS.COMMUNITY;
 
 const mapPreference = (profileId: string, preference?: PreferenceRow | null): ApiUserPreference | null => {
   if (!preference) {
@@ -32,6 +42,11 @@ const mapPreference = (profileId: string, preference?: PreferenceRow | null): Ap
       baseCurrency: "USD",
       autoResetOnStopOut: false,
       notificationsEnabled: true,
+      subscriptionTier: "COMMUNITY",
+      accountStatus: "ACTIVE",
+      stopOutThreshold: DEFAULT_STOP_OUT_THRESHOLD.toFixed(2),
+      lastStopOutAt: null,
+      subscriptionExpiresAt: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -45,6 +60,11 @@ const mapPreference = (profileId: string, preference?: PreferenceRow | null): Ap
     baseCurrency: preference.base_currency,
     autoResetOnStopOut: preference.auto_reset_on_stop_out,
     notificationsEnabled: preference.notifications_enabled,
+    subscriptionTier: preference.subscription_tier,
+    accountStatus: preference.account_status,
+    stopOutThreshold: preference.stop_out_threshold,
+    lastStopOutAt: preference.last_stop_out_at,
+    subscriptionExpiresAt: preference.subscription_expires_at,
     createdAt: preference.created_at,
     updatedAt: preference.updated_at
   };
@@ -351,15 +371,35 @@ export const updatePreferences = async (payload: UpdatePreferencesPayload): Prom
     throw new Error("Not authenticated.");
   }
 
+  const profile = await loadProfileById(user.id);
+
+  if (!profile?.preference) {
+    throw new Error("Preference record not found.");
+  }
+
+  const activeTier = profile.preference.subscriptionTier;
+  const tierCap = getBalanceCap(activeTier);
+
   const updatePayload: Record<string, unknown> = {
     updated_at: new Date().toISOString()
   };
 
   if (typeof payload.startingBalance === "number") {
+    if (payload.startingBalance > tierCap) {
+      throw new Error(
+        `Your ${activeTier.toLowerCase()} plan caps the starting balance at $${tierCap.toLocaleString("en-US")}.`
+      );
+    }
+
     updatePayload.starting_balance = payload.startingBalance.toFixed(2);
   }
 
   if (typeof payload.currentBalance === "number") {
+    if (payload.currentBalance > tierCap) {
+      throw new Error(
+        `Your ${activeTier.toLowerCase()} plan caps the account balance at $${tierCap.toLocaleString("en-US")}.`
+      );
+    }
     updatePayload.current_balance = payload.currentBalance.toFixed(2);
   }
 
@@ -400,12 +440,20 @@ export const resetBalance = async (): Promise<ApiUser> => {
 
   const { data: preference, error: fetchError } = await supabase
     .from("preferences")
-    .select("starting_balance")
+    .select("starting_balance, subscription_tier, account_status")
     .eq("profile_id", user.id)
     .maybeSingle();
 
   if (fetchError) {
     throw new Error(fetchError.message);
+  }
+
+  if (!preference) {
+    throw new Error("Preference record missing.");
+  }
+
+  if (preference.subscription_tier === "COMMUNITY") {
+    throw new Error("Recharge requires an active Pro or Ultimate subscription.");
   }
 
   const balance = preference?.starting_balance ?? DEFAULT_BALANCE.toFixed(2);
@@ -414,6 +462,83 @@ export const resetBalance = async (): Promise<ApiUser> => {
     .from("preferences")
     .update({
       current_balance: balance,
+      account_status: "ACTIVE",
+      updated_at: new Date().toISOString()
+    })
+    .eq("profile_id", user.id);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  return (await loadProfileById(user.id))!;
+};
+
+export const markStopOutStatus = async (currentBalance: number): Promise<ApiUser> => {
+  const sanitizedBalance = Math.max(0, Number.isFinite(currentBalance) ? currentBalance : 0);
+
+  const {
+    data: { user },
+    error
+  } = await supabase.auth.getUser();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!user) {
+    throw new Error("Not authenticated.");
+  }
+
+  const { error: updateError } = await supabase
+    .from("preferences")
+    .update({
+      current_balance: sanitizedBalance.toFixed(2),
+      account_status: "STOPPED_OUT",
+      last_stop_out_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    .eq("profile_id", user.id);
+
+  if (updateError) {
+    throw new Error(updateError.message);
+  }
+
+  return (await loadProfileById(user.id))!;
+};
+
+export const activateSubscription = async ({ tier, durationDays = 30 }: ActivateSubscriptionPayload): Promise<ApiUser> => {
+  const {
+    data: { user },
+    error
+  } = await supabase.auth.getUser();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!user) {
+    throw new Error("Not authenticated.");
+  }
+
+  const profile = await loadProfileById(user.id);
+
+  if (!profile?.preference) {
+    throw new Error("Preference record missing.");
+  }
+
+  const tierCap = getBalanceCap(tier);
+  const desiredStartingBalance = tierCap;
+  const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
+
+  const { error: updateError } = await supabase
+    .from("preferences")
+    .update({
+      subscription_tier: tier,
+      subscription_expires_at: expiresAt,
+      account_status: "ACTIVE",
+      starting_balance: desiredStartingBalance.toFixed(2),
+      current_balance: desiredStartingBalance.toFixed(2),
       updated_at: new Date().toISOString()
     })
     .eq("profile_id", user.id);

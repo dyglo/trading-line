@@ -13,11 +13,16 @@ create table if not exists public.profiles (
 create table if not exists public.preferences (
   id uuid primary key default gen_random_uuid(),
   profile_id uuid not null unique references public.profiles (id) on delete cascade,
-  starting_balance numeric(14, 2) not null default 10000,
-  current_balance numeric(14, 2) not null default 10000,
+  starting_balance numeric(14, 2) not null default 1000,
+  current_balance numeric(14, 2) not null default 1000,
   base_currency text not null default 'USD',
   auto_reset_on_stop_out boolean not null default false,
   notifications_enabled boolean not null default true,
+  subscription_tier text not null default 'COMMUNITY' check (subscription_tier in ('COMMUNITY', 'PRO', 'ULTIMATE')),
+  account_status text not null default 'ACTIVE' check (account_status in ('ACTIVE', 'STOPPED_OUT')),
+  stop_out_threshold numeric(14, 2) not null default 200,
+  last_stop_out_at timestamptz,
+  subscription_expires_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -81,7 +86,13 @@ create policy if not exists "Preferences select own" on public.preferences
 
 create policy if not exists "Preferences upsert own" on public.preferences
   using (auth.uid() = profile_id)
-  with check (auth.uid() = profile_id);
+  with check (
+    auth.uid() = profile_id
+    and (
+      account_status <> 'STOPPED_OUT'
+      or subscription_tier <> 'COMMUNITY'
+    )
+  );
 
 -- Onboarding catalog is readable by authenticated users only.
 create policy if not exists "Onboarding questions readable" on public.onboarding_questions
@@ -99,6 +110,66 @@ create policy if not exists "Onboarding responses insert own" on public.onboardi
 
 create policy if not exists "Onboarding responses delete own" on public.onboarding_responses
   for delete using (auth.uid() = profile_id);
+
+-- Strategy builder tables
+create table if not exists public.strategies (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references public.profiles (id) on delete cascade,
+  name text not null,
+  mode text not null check (mode in ('GUI', 'SCRIPTING')),
+  code text not null,
+  autosave_enabled boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.strategy_ai_messages (
+  id uuid primary key default gen_random_uuid(),
+  strategy_id uuid not null references public.strategies (id) on delete cascade,
+  role text not null check (role in ('assistant', 'user')),
+  content text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.strategies enable row level security;
+alter table public.strategy_ai_messages enable row level security;
+
+create policy if not exists "Strategies select own" on public.strategies
+  for select using (auth.uid() = profile_id);
+
+create policy if not exists "Strategies modify own" on public.strategies
+  using (auth.uid() = profile_id)
+  with check (auth.uid() = profile_id);
+
+create policy if not exists "Strategy messages select own" on public.strategy_ai_messages
+  for select using (
+    exists (
+      select 1
+      from public.strategies s
+      where s.id = strategy_id
+        and s.profile_id = auth.uid()
+    )
+  );
+
+create policy if not exists "Strategy messages insert own" on public.strategy_ai_messages
+  for insert with check (
+    exists (
+      select 1
+      from public.strategies s
+      where s.id = strategy_id
+        and s.profile_id = auth.uid()
+    )
+  );
+
+create policy if not exists "Strategy messages delete own" on public.strategy_ai_messages
+  for delete using (
+    exists (
+      select 1
+      from public.strategies s
+      where s.id = strategy_id
+        and s.profile_id = auth.uid()
+    )
+  );
 
 -- Helpful trigger to keep updated_at fresh.
 create or replace function public.touch_updated_at() returns trigger as $$
@@ -157,6 +228,16 @@ begin
   ) then
     create trigger onboarding_responses_touch_updated_at
       before update on public.onboarding_responses
+      for each row execute procedure public.touch_updated_at();
+  end if;
+
+  if not exists (
+    select 1
+    from pg_trigger
+    where tgname = 'strategies_touch_updated_at'
+  ) then
+    create trigger strategies_touch_updated_at
+      before update on public.strategies
       for each row execute procedure public.touch_updated_at();
   end if;
 end;

@@ -17,6 +17,7 @@ import { useForm } from "react-hook-form";
 import { Link } from "react-router-dom";
 import { z } from "zod";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -90,8 +91,8 @@ const Profile = () => {
   const defaultPreference = useMemo(() => {
     const preference = user?.preference;
     return {
-      startingBalance: preference ? Number(preference.startingBalance) : 10_000,
-      currentBalance: preference ? Number(preference.currentBalance) : 10_000,
+      startingBalance: preference ? Number(preference.startingBalance) : 1_000,
+      currentBalance: preference ? Number(preference.currentBalance) : 1_000,
       baseCurrency: preference?.baseCurrency ?? "USD",
       autoResetOnStopOut: preference?.autoResetOnStopOut ?? false,
       notificationsEnabled: preference?.notificationsEnabled ?? true
@@ -269,6 +270,15 @@ const Profile = () => {
             </div>
           </div>
         </motion.section>
+
+        <Alert className="mt-6 border-emerald-500/30 bg-emerald-500/10 text-white">
+          <AlertTitle>Community plan policy</AlertTitle>
+          <AlertDescription className="text-white/80">
+            New traders receive a $1,000 practice balance. If equity falls below{" "}
+            {formatCurrency(Number(user?.preference?.stopOutThreshold ?? 200))}, the account is stopped out and recharges require a
+            Pro or Ultimate subscription. Upgrade anytime to unlock higher balance caps and unlimited resets.
+          </AlertDescription>
+        </Alert>
 
         <motion.section
           initial={{ opacity: 0, y: 16 }}
